@@ -1,0 +1,16 @@
+{
+  "name": "chatapp",
+  "version": "3.0.0",
+  "description": "Chat app: WebRTC data channels for one-to-one chat and file transfer, Socket.IO rooms, JWT auth, PostgreSQL history",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie": "^0.6.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5",
+    "socket.io": "^4.7.5"
+  }
+}

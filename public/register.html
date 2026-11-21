@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register - ChatApp</title></head>
+<body style="font-family:system-ui,sans-serif;padding:2rem;max-width:360px">
+  <h2>Register</h2>
+  <p><input id="first_name" placeholder="First name" style="width:100%"></p>
+  <p><input id="last_name" placeholder="Last name" style="width:100%"></p>
+  <p><input id="username" placeholder="Username (shown in chats)" style="width:100%"></p>
+  <p><input id="email" type="email" placeholder="Email" style="width:100%"></p>
+  <p>Gender:
+    <label><input type="radio" name="gender" value="Male"> Male</label>
+    <label><input type="radio" name="gender" value="Female"> Female</label></p>
+  <p><input id="phone_number" type="tel" placeholder="Phone number" style="width:100%"></p>
+  <p><input id="password" type="password" placeholder="Password (6+ characters)" style="width:100%"></p>
+  <button id="submit">Submit</button> <a href="/login.html">Back to login</a>
+  <p id="err" style="color:red"></p>
+<script>
+const val = (id) => document.getElementById(id).value;
+document.getElementById('submit').onclick = async () => {
+  const g = document.querySelector('input[name=gender]:checked');
+  const body = { first_name: val('first_name'), last_name: val('last_name'), username: val('username'),
+    email: val('email'), gender: g ? g.value : '', phone_number: val('phone_number'), password: val('password') };
+  const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (res.ok) location.href = '/app.html'; else document.getElementById('err').textContent = data.error;
+};
+</script></body></html>
