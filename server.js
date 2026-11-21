@@ -18,4 +18,11 @@ app.get('/', (req, res) => res.redirect('/login.html'));
 setupSockets(io, online);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`ChatApp running on http://localhost:${PORT}`));
+
+// Create tables on startup. schema.sql only uses CREATE ... IF NOT EXISTS, so this is safe
+// on every boot and means a fresh database (e.g. on Render) needs no manual psql step.
+const fs = require('fs');
+const pool = require('./src/db');
+pool.query(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'))
+  .then(() => server.listen(PORT, () => console.log(`ChatApp running on http://localhost:${PORT}`)))
+  .catch((err) => { console.error('Could not set up the database schema:', err.message); process.exit(1); });
