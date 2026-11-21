@@ -1,22 +1,35 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Register - ChatApp</title></head>
-<body style="font-family:system-ui,sans-serif;padding:2rem;max-width:360px">
-  <h2>Register</h2>
-  <p><input id="first_name" placeholder="First name" style="width:100%"></p>
-  <p><input id="last_name" placeholder="Last name" style="width:100%"></p>
-  <p><input id="username" placeholder="Username (shown in chats)" style="width:100%"></p>
-  <p><input id="email" type="email" placeholder="Email" style="width:100%"></p>
-  <p>Gender:
-    <label><input type="radio" name="gender" value="Male"> Male</label>
-    <label><input type="radio" name="gender" value="Female"> Female</label></p>
-  <p><input id="phone_number" type="tel" placeholder="Phone number" style="width:100%"></p>
-  <p><input id="password" type="password" placeholder="Password (6+ characters)" style="width:100%"></p>
-  <button id="submit">Submit</button> <a href="/login.html">Back to login</a>
-  <p id="err" style="color:red"></p>
+<title>Register - ChatApp</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<main class="auth">
+  <form class="card" id="registerForm">
+    <h1>Create account</h1>
+    <p class="sub">Your username is what other people see in chats.</p>
+    <div class="row2">
+      <label class="field">First name<input id="first_name" autocomplete="given-name" required></label>
+      <label class="field">Last name<input id="last_name" autocomplete="family-name" required></label>
+    </div>
+    <label class="field">Username<input id="username" autocomplete="username" required></label>
+    <label class="field">Email<input id="email" type="email" autocomplete="email" required></label>
+    <div class="field">Gender
+      <div class="radios">
+        <label><input type="radio" name="gender" value="Male"> Male</label>
+        <label><input type="radio" name="gender" value="Female"> Female</label>
+      </div>
+    </div>
+    <label class="field">Phone number<input id="phone_number" type="tel" autocomplete="tel"></label>
+    <label class="field">Password <span style="color:var(--muted)">(6+ characters)</span>
+      <input id="password" type="password" autocomplete="new-password" required></label>
+    <button class="btn" id="submit">Create account</button>
+    <p class="err" id="err"></p>
+    <p class="switch">Already have an account? <a href="/login.html">Log in</a></p>
+  </form>
+</main>
 <script>
 const val = (id) => document.getElementById(id).value;
-document.getElementById('submit').onclick = async () => {
+document.getElementById('registerForm').onsubmit = async (e) => {
+  e.preventDefault();
   const g = document.querySelector('input[name=gender]:checked');
   const body = { first_name: val('first_name'), last_name: val('last_name'), username: val('username'),
     email: val('email'), gender: g ? g.value : '', phone_number: val('phone_number'), password: val('password') };

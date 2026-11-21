@@ -32,7 +32,11 @@ function addRow({ sender, text, file, time, tick, sys }) {
   const p = document.createElement('p');
   if (sys) { p.className = 'sys'; p.textContent = text; }
   else {
-    p.append(`${time ? new Date(time).toLocaleTimeString() + ' ' : ''}${sender}: `);
+    p.className = 'msg' + (sender === me ? ' mine' : '');
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    meta.textContent = (sender === me ? 'You' : sender) + (time ? ' · ' + new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+    p.append(meta);
     if (file) {
       const b = document.createElement('b'); b.textContent = file.name; p.append(b, ' ');
       const dl = document.createElement('a'); dl.href = file.url; dl.download = file.name; dl.textContent = '(Download)'; p.append(dl);
@@ -47,6 +51,11 @@ function addRow({ sender, text, file, time, tick, sys }) {
   }
   $('msgs').appendChild(p);
   $('msgs').scrollTop = $('msgs').scrollHeight;
+}
+// Highlight the open chat in the sidebar.
+function markActive() {
+  document.querySelectorAll('#users li, #rooms li').forEach((li) => li.classList.toggle('active',
+    (mode?.type === 'dm' && li.dataset.name === mode.peer) || (mode?.type === 'room' && li.dataset.room === mode.room)));
 }
 function rowFromDb(m, kind) {
   const item = { sender: m.sender, time: m.sent_time };
@@ -64,7 +73,7 @@ function rowFromDb(m, kind) {
   me = data.username;
   $('me').textContent = me;
   data.rooms.forEach((room) => {
-    const li = document.createElement('li'); li.textContent = room; li.onclick = () => openRoom(room); $('rooms').appendChild(li);
+    const li = document.createElement('li'); li.textContent = room; li.dataset.room = room; li.onclick = () => openRoom(room); $('rooms').appendChild(li);
   });
   allUsers = await api('/users');
   renderUsers();
@@ -75,10 +84,12 @@ function renderUsers() {
   $('users').innerHTML = '';
   allUsers.forEach((u) => {
     const li = document.createElement('li');
-    li.textContent = u; li.className = onlineSet.has(u) ? 'on' : 'off';
+    li.textContent = u; li.className = onlineSet.has(u) ? 'on' : 'off'; li.dataset.name = u;
+    li.title = onlineSet.has(u) ? 'Online' : 'Offline';
     li.onclick = () => openDM(u, true);
     $('users').appendChild(li);
   });
+  markActive();
 }
 socket.on('presence', async (list) => { onlineSet = new Set(list); allUsers = await api('/users'); renderUsers(); });
 socket.on('connect_error', () => (location.href = '/login.html'));
@@ -87,6 +98,7 @@ $('logout').onclick = async () => { await send('/logout', {}); location.href = '
 // ---------- one-to-one chat: WebRTC data channel ----------
 async function openDM(peer, initiate) {
   const my = (mode = { type: 'dm', peer });
+  markActive();
   $('msgs').innerHTML = '';
   setInputs(dmOpen());
   const hist = await api('/history/' + encodeURIComponent(peer));
@@ -196,6 +208,7 @@ socket.on('read', ({ by }) => {
 // ---------- rooms: Socket.IO via the server ----------
 async function openRoom(room) {
   const my = (mode = { type: 'room', room });
+  markActive();
   $('msgs').innerHTML = '';
   socket.emit('room:join', room);
   const hist = await api('/rooms/' + encodeURIComponent(room));
