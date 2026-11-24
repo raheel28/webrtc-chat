@@ -3,16 +3,15 @@ const MAX_FILE = 5 * 1024 * 1024;
 const CHUNK = 16 * 1024;
 const VIEWABLE_EXT = /\.(png|jpe?g|gif|webp|pdf)$/i;
 const VIEWABLE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'application/pdf'];
-const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };  // STUN: discover public address
+const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 const socket = io({ autoConnect: false });
 
 let me = null;
-let mode = null;                       // {type:'dm', peer} | {type:'room', room}
-let pc = null, channel = null, rtcPeer = null;   // WebRTC state
+let mode = null;
+let pc = null, channel = null, rtcPeer = null;
 let pendingIce = [], incoming = null, readTimer = null;
 let allUsers = [], onlineSet = new Set();
 
-// ---------- small helpers ----------
 async function api(path, opts = {}) {
   const res = await fetch('/api' + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
   if (res.status === 401) { location.href = '/login.html'; throw new Error('unauthorized'); }
@@ -27,7 +26,6 @@ const toDataURL = (file) => new Promise((resolve, reject) => {
 });
 const dmOpen = () => channel && channel.readyState === 'open' && mode?.type === 'dm' && rtcPeer === mode.peer;
 
-// One renderer for every message. textContent only, so message text can never inject HTML.
 function addRow({ sender, text, file, time, tick, sys }) {
   const p = document.createElement('p');
   if (sys) { p.className = 'sys'; p.textContent = text; }
@@ -52,7 +50,6 @@ function addRow({ sender, text, file, time, tick, sys }) {
   $('msgs').appendChild(p);
   $('msgs').scrollTop = $('msgs').scrollHeight;
 }
-// Highlight the open chat in the sidebar.
 function markActive() {
   document.querySelectorAll('#users li, #rooms li').forEach((li) => li.classList.toggle('active',
     (mode?.type === 'dm' && li.dataset.name === mode.peer) || (mode?.type === 'room' && li.dataset.room === mode.room)));
@@ -67,7 +64,6 @@ function rowFromDb(m, kind) {
   return item;
 }
 
-// ---------- startup ----------
 (async () => {
   const data = await api('/me');
   me = data.username;
@@ -95,14 +91,13 @@ socket.on('presence', async (list) => { onlineSet = new Set(list); allUsers = aw
 socket.on('connect_error', () => (location.href = '/login.html'));
 $('logout').onclick = async () => { await send('/logout', {}); location.href = '/login.html'; };
 
-// ---------- one-to-one chat: WebRTC data channel ----------
 async function openDM(peer, initiate) {
   const my = (mode = { type: 'dm', peer });
   markActive();
   $('msgs').innerHTML = '';
   setInputs(dmOpen());
   const hist = await api('/history/' + encodeURIComponent(peer));
-  if (mode !== my) return;                         // user clicked something else meanwhile
+  if (mode !== my) return;
   hist.forEach((m) => addRow(rowFromDb(m, 'dm')));
   markRead();
   if (!initiate) return setStatus(`Chat with ${peer}`);
@@ -114,10 +109,9 @@ function createPeerConnection(remote) {
   closeConnection();
   rtcPeer = remote; pendingIce = []; incoming = null;
   pc = new RTCPeerConnection(rtcConfig);
-  // Each network path the browser discovers (an ICE candidate) is relayed to the other side.
   pc.onicecandidate = (e) => { if (e.candidate) socket.emit('ice', { to: remote, payload: e.candidate }); };
   pc.onconnectionstatechange = () => { if (mode?.peer === remote) setStatus(`Peer connection to ${remote}: ${pc.connectionState}`); };
-  pc.ondatachannel = (e) => setupChannel(e.channel);   // callee receives the caller's channel
+  pc.ondatachannel = (e) => setupChannel(e.channel);
 }
 
 function setupChannel(ch) {
@@ -129,7 +123,7 @@ function setupChannel(ch) {
   ch.onclose = () => { if (mode?.type === 'dm') setInputs(false); };
   ch.onmessage = (e) => {
     const viewing = mode?.type === 'dm' && mode.peer === rtcPeer;
-    if (typeof e.data !== 'string') {              // binary = a file chunk
+    if (typeof e.data !== 'string') {
       if (incoming) { incoming.chunks.push(e.data); incoming.got += e.data.byteLength; if (incoming.got > MAX_FILE) incoming = null; }
       return;
     }
@@ -137,7 +131,6 @@ function setupChannel(ch) {
     if (m.t === 'text' && viewing) { addRow({ sender: rtcPeer, text: String(m.text), time: Date.now() }); scheduleRead(); }
     else if (m.t === 'file-start') incoming = { name: String(m.name).slice(0, 200), type: String(m.type || ''), chunks: [], got: 0 };
     else if (m.t === 'file-end' && incoming) {
-      // Only allowlisted types keep their MIME type, so a received HTML file can't run on our origin.
       const type = VIEWABLE_TYPES.includes(incoming.type) ? incoming.type : 'application/octet-stream';
       const url = URL.createObjectURL(new Blob(incoming.chunks, { type }));
       if (viewing) {
@@ -154,14 +147,14 @@ function closeConnection() {
   if (pc) { pc.close(); pc = null; }
 }
 
-async function call(remote) {                       // caller: create channel, make offer
+async function call(remote) {
   createPeerConnection(remote);
   setupChannel(pc.createDataChannel('chat'));
   await pc.setLocalDescription(await pc.createOffer());
   socket.emit('offer', { to: remote, payload: pc.localDescription });
   setStatus(`Connecting to ${remote}...`);
 }
-socket.on('offer', async ({ from, payload }) => {   // callee: accept offer, send answer
+socket.on('offer', async ({ from, payload }) => {
   if (!(mode?.type === 'dm' && mode.peer === from)) await openDM(from, false);
   createPeerConnection(from);
   await pc.setRemoteDescription(payload);
@@ -172,7 +165,7 @@ socket.on('offer', async ({ from, payload }) => {   // callee: accept offer, sen
 socket.on('answer', async ({ from, payload }) => { if (pc && from === rtcPeer) { await pc.setRemoteDescription(payload); await flushIce(); } });
 socket.on('ice', async ({ from, payload }) => {
   if (!pc || from !== rtcPeer) return;
-  if (pc.remoteDescription) await pc.addIceCandidate(payload); else pendingIce.push(payload);  // too early: queue
+  if (pc.remoteDescription) await pc.addIceCandidate(payload); else pendingIce.push(payload);
 });
 async function flushIce() { while (pendingIce.length) await pc.addIceCandidate(pendingIce.shift()); }
 socket.on('hangup', ({ from }) => {
@@ -186,26 +179,24 @@ async function sendDMFile(file) {
   const ch = channel;
   ch.send(JSON.stringify({ t: 'file-start', name: file.name, type: file.type }));
   for (let o = 0; o < file.size; o += CHUNK) {
-    while (ch.bufferedAmount > 1e6) await sleep(20);              // back-pressure so we don't flood the channel
+    while (ch.bufferedAmount > 1e6) await sleep(20);
     ch.send(await file.slice(o, o + CHUNK).arrayBuffer());
   }
   ch.send(JSON.stringify({ t: 'file-end' }));
   const url = URL.createObjectURL(file);
   const viewable = VIEWABLE_TYPES.includes(file.type);
   addRow({ sender: me, time: Date.now(), tick: false, file: { name: file.name, url, viewUrl: viewable ? url : null } });
-  send('/dm-file', { to: rtcPeer, name: file.name, data: await toDataURL(file) }).catch(console.error);  // history copy
+  send('/dm-file', { to: rtcPeer, name: file.name, data: await toDataURL(file) }).catch(console.error);
 }
 
-// ---------- read receipts ----------
 const markRead = () => { if (mode?.type === 'dm') api('/read/' + encodeURIComponent(mode.peer), { method: 'PUT' }).catch(() => {}); };
-const scheduleRead = () => { clearTimeout(readTimer); readTimer = setTimeout(markRead, 1000); };  // short delay lets the sender's history copy land first
+const scheduleRead = () => { clearTimeout(readTimer); readTimer = setTimeout(markRead, 1000); };
 window.addEventListener('focus', markRead);
 socket.on('read', ({ by }) => {
   if (mode?.type === 'dm' && mode.peer === by)
     document.querySelectorAll('#msgs .tick:not(.read)').forEach((s) => { s.classList.add('read'); s.textContent = ' ✓✓'; });
 });
 
-// ---------- rooms: Socket.IO via the server ----------
 async function openRoom(room) {
   const my = (mode = { type: 'room', room });
   markActive();
@@ -221,7 +212,6 @@ socket.on('room:message', (m) => { if (mode?.type === 'room' && mode.room === m.
 socket.on('room:joined', ({ room, user }) => { if (mode?.type === 'room' && mode.room === room) addRow({ sys: true, text: `${user} joined the room` }); });
 socket.on('room:error', (msg) => addRow({ sys: true, text: msg }));
 
-// ---------- sending ----------
 $('form').onsubmit = async (e) => {
   e.preventDefault();
   if (!mode) return;
@@ -239,9 +229,9 @@ $('form').onsubmit = async (e) => {
   if (text) {
     if (m.type === 'room') socket.emit('room:message', { room: m.room, text });
     else {
-      channel.send(JSON.stringify({ t: 'text', text }));          // delivered directly to the other browser
+      channel.send(JSON.stringify({ t: 'text', text }));
       addRow({ sender: me, text, time: Date.now(), tick: false });
-      send('/messages', { to: m.peer, text }).catch(console.error); // history copy for reloads
+      send('/messages', { to: m.peer, text }).catch(console.error);
     }
     $('input').value = '';
   }

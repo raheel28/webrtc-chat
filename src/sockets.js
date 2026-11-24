@@ -3,7 +3,6 @@ const { readToken } = require('./auth');
 const { ROOMS, validFile } = require('./config');
 
 module.exports = function setupSockets(io, online) {
-  // Every socket is authenticated from the signed cookie before it can do anything.
   io.use((socket, next) => {
     try { socket.data.user = readToken(socket.handshake.headers.cookie); next(); }
     catch { next(new Error('unauthorized')); }
@@ -14,7 +13,6 @@ module.exports = function setupSockets(io, online) {
     online.set(me, socket.id);
     io.emit('presence', [...online.keys()]);
 
-    // WebRTC signaling relay. The server passes `payload` along without reading it.
     for (const ev of ['offer', 'answer', 'ice', 'hangup']) {
       socket.on(ev, ({ to, payload }) => {
         const id = online.get(to);
@@ -22,7 +20,6 @@ module.exports = function setupSockets(io, online) {
       });
     }
 
-    // ---------- rooms ----------
     socket.on('room:join', (room) => {
       if (!ROOMS.includes(room)) return;
       for (const r of [...socket.rooms]) if (ROOMS.includes(r)) socket.leave(r);
@@ -30,7 +27,6 @@ module.exports = function setupSockets(io, online) {
       socket.to(room).emit('room:joined', { room, user: me });
     });
 
-    // Save first, then broadcast, so every client sees exactly what is stored.
     async function post(room, text, name, data) {
       const q = await pool.query(
         'INSERT INTO room_chat (room, sender, mess_age, file_name, base) VALUES ($1,$2,$3,$4,$5) RETURNING id, sent_time',

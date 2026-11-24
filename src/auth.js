@@ -9,7 +9,6 @@ const setAuthCookie = (res, token) =>
   res.cookie('token', token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 7 * 24 * 3600 * 1000 });
 const readToken = (cookieHeader) => jwt.verify(cookie.parse(cookieHeader || '').token, JWT_SECRET);
 
-// Express middleware: identity comes from the signed cookie, never from request bodies.
 function auth(req, res, next) {
   try { req.user = readToken(req.headers.cookie); next(); }
   catch { res.status(401).json({ error: 'Not logged in' }); }

@@ -1,4 +1,4 @@
-require('dotenv').config();               // must run before ./src modules read process.env
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -8,8 +8,8 @@ const setupSockets = require('./src/sockets');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 8e6 });   // allows ~5 MB files in rooms
-const online = new Map();                                      // username -> socket.id
+const io = new Server(server, { maxHttpBufferSize: 8e6 });
+const online = new Map();
 
 app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -19,8 +19,6 @@ setupSockets(io, online);
 
 const PORT = process.env.PORT || 3000;
 
-// Create tables on startup. schema.sql only uses CREATE ... IF NOT EXISTS, so this is safe
-// on every boot and means a fresh database (e.g. on Render) needs no manual psql step.
 const fs = require('fs');
 const pool = require('./src/db');
 pool.query(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'))

@@ -10,7 +10,6 @@ module.exports = function createRoutes({ io, online }) {
     fn(req, res).catch((e) => { console.error(e); res.status(500).json({ error: 'Server error' }); });
   const bad = (res, error, code = 400) => res.status(code).json({ error });
 
-  // ---------- accounts (from the original /reg and /login, now with sessions) ----------
   r.post('/register', wrap(async (req, res) => {
     const b = req.body;
     const first_name = String(b.first_name || '').trim();
@@ -56,7 +55,6 @@ module.exports = function createRoutes({ io, online }) {
     res.json(q.rows.map((x) => x.username));
   }));
 
-  // ---------- one-to-one history ----------
   r.get('/history/:user', auth, wrap(async (req, res) => {
     const q = await pool.query(
       `SELECT id, sender, mess_age, file_name, (base IS NOT NULL) AS has_file, read_status, sent_time
@@ -66,7 +64,6 @@ module.exports = function createRoutes({ io, online }) {
     res.json(q.rows);
   }));
 
-  // The sender's browser reports each text message after sending it over the data channel.
   r.post('/messages', auth, wrap(async (req, res) => {
     const { to, text } = req.body;
     if (!to || !text || String(text).length > 2000) return bad(res, 'Bad message');
@@ -87,7 +84,6 @@ module.exports = function createRoutes({ io, online }) {
     res.json({ ok: true });
   }));
 
-  // Recipient opened the conversation: mark their unread messages read and tell the sender.
   r.put('/read/:user', auth, wrap(async (req, res) => {
     const me = req.user.username, peer = req.params.user;
     const q = await pool.query(
@@ -96,7 +92,6 @@ module.exports = function createRoutes({ io, online }) {
     res.json({ updated: q.rowCount });
   }));
 
-  // ---------- room history ----------
   r.get('/rooms/:room', auth, wrap(async (req, res) => {
     if (!ROOMS.includes(req.params.room)) return bad(res, 'No such room', 404);
     const q = await pool.query(
@@ -105,7 +100,6 @@ module.exports = function createRoutes({ io, online }) {
     res.json(q.rows);
   }));
 
-  // ---------- stored files (access-checked; only safe types can open inline) ----------
   r.get('/files/:kind/:id', auth, wrap(async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) return bad(res, 'Not found', 404);
